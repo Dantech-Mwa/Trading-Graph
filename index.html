@@ -59,7 +59,6 @@
     }
     .container { max-width:1400px; margin:0 auto; }
 
-    /* Header */
     .header{
       text-align:center; margin-bottom:16px;
       backdrop-filter:blur(10px); background:var(--glass);
@@ -83,7 +82,7 @@
     .trading-buttons{display:flex;justify-content:center;gap:12px;margin:12px 0}
     .btn{
       padding:10px 20px; border:none; border-radius:12px;
-      font-weight:bold; cursor:pointer; transition:var(--transition);
+      font-weight:bold; cursor:pointer; transition:all .3s;
       box-shadow:var(--shadow);
     }
     .btn-buy{background:var(--green);color:#fff}
@@ -176,7 +175,10 @@
     Dark/Light
   </button>
 
-  <button class="wallet-btn" onclick="connectWallet()">Connect Wallet</button>
+  <!-- CONNECT BINANCE WALLET BUTTON -->
+  <button class="wallet-btn" id="connectBinanceWallet">
+    Connect Binance Wallet
+  </button>
 
   <div class="container">
     <div class="header">
@@ -225,9 +227,66 @@
 
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   <script>
-    /* ──────────────────────────────────────────────────────────────
-       THEME TOGGLE
-       ────────────────────────────────────────────────────────────── */
+    // ──────────────────────────────────────────────────────────────
+    // BINANCE WALLET CONNECTION (REPLACES connectWallet)
+    // ──────────────────────────────────────────────────────────────
+    const connectBtn = document.getElementById('connectBinanceWallet');
+    let isConnected = false;
+
+    function openBinanceWallet() {
+      const width = 500, height = 700;
+      const left = (screen.width / 2) - (width / 2);
+      const top = (screen.height / 2) - (height / 2);
+
+      const popup = window.open(
+        'https://www.binance.com/en/web3',
+        'binance-wallet-connect',
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+      );
+
+      if (!popup) {
+        alert('Please allow popups to connect your Binance Wallet.');
+        return;
+      }
+
+      // Listen for postMessage from Binance (if supported)
+      const handler = (e) => {
+        if (e.origin !== 'https://www.binance.com') return;
+        if (e.data && (e.data.type === 'BINANCE_WALLET_CONNECTED' || e.data.connected)) {
+          finalizeConnection();
+        }
+      };
+      window.addEventListener('message', handler);
+
+      // Fallback: detect popup close
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', handler);
+          if (!isConnected) {
+            connectBtn.textContent = 'Connection Cancelled';
+            setTimeout(() => connectBtn.textContent = 'Connect Binance Wallet', 2000);
+          }
+        }
+      }, 500);
+
+      function finalizeConnection() {
+        if (isConnected) return;
+        isConnected = true;
+        connectBtn.textContent = 'Wallet Connected';
+        connectBtn.style.background = 'var(--green)';
+        connectBtn.disabled = true;
+        popup.close();
+        window.removeEventListener('message', handler);
+        clearInterval(checkClosed);
+      }
+    }
+
+    connectBtn.addEventListener('click', openBinanceWallet);
+
+    // ──────────────────────────────────────────────────────────────
+    // THEME TOGGLE
+    // ──────────────────────────────────────────────────────────────
     const html = document.documentElement;
     const toggleBtn = document.getElementById('themeToggle');
 
@@ -237,7 +296,6 @@
       toggleBtn.textContent = theme === 'dark' ? 'Light' : 'Dark';
     }
 
-    // Init
     const saved = localStorage.getItem('theme') || 'dark';
     setTheme(saved);
 
@@ -246,16 +304,15 @@
       setTheme(newTheme);
     });
 
-    /* ──────────────────────────────────────────────────────────────
-       REST OF YOUR ORIGINAL CODE (MACD fixed, etc.)
-       ────────────────────────────────────────────────────────────── */
+    // ──────────────────────────────────────────────────────────────
+    // REST OF YOUR ORIGINAL CODE (UNCHANGED)
+    // ──────────────────────────────────────────────────────────────
     const SYMBOL = 'BNBUSDT';
     const BINANCE_TRADE_URL = `https://www.binance.com/en/trade/${SYMBOL}`;
     let binanceSocket = null;
     let chartData = [], volumeData = [], lastPrice = 0;
     let volumeChart, rsiChart, macdChart;
 
-    // TradingView
     function initTradingView() {
       new TradingView.widget({
         width: "100%", height: "400", symbol: `BINANCE:${SYMBOL}`,
@@ -267,11 +324,9 @@
       });
     }
 
-    // Chart.js init
     function initCharts() {
       const grid = 'var(--grid)', text = 'var(--text)';
 
-      // Volume
       volumeChart = new Chart(document.getElementById('volumeChart'), {
         type:'bar', data:{datasets:[{
           label:'Volume', data:[],
@@ -293,7 +348,6 @@
         }
       });
 
-      // RSI
       rsiChart = new Chart(document.getElementById('rsiChart'), {
         type:'line', data:{datasets:[{
           label:'RSI', data:[], borderColor:'#aa00ff',
@@ -308,7 +362,6 @@
         }
       });
 
-      // MACD (still using the fixed version)
       macdChart = new Chart(document.getElementById('macdChart'), {
         type:'bar', data:{datasets:[
           {label:'MACD Histogram',data:[],backgroundColor:ctx=>(ctx.parsed?.y??0)>=0?
@@ -330,7 +383,6 @@
       });
     }
 
-    // ───── EMA helper (returns array of same length as input) ─────
     function ema(series, period) {
       const k = 2/(period+1);
       const result = [];
@@ -344,7 +396,6 @@
       return result;
     }
 
-    // ───── MACD (fixed) ─────
     function calculateMACD(data, fast=12, slow=26, signal=9){
       if (data.length < slow+signal) return {histogram:[],macdLine:[],signalLine:[]};
       const fastEMA = ema(data,fast);
@@ -366,7 +417,6 @@
       return {histogram, macdLine, signalLine};
     }
 
-    // ───── RSI (unchanged) ─────
     function calculateRSI(data, period=14){
       if (data.length < period+1) return [];
       const gains=[], losses=[];
@@ -386,7 +436,6 @@
       return rsi.map((v,i)=>({x:data[i+period].x, y:v}));
     }
 
-    // ───── WebSocket ─────
     function connectBinanceWebSocket(){
       const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${SYMBOL.toLowerCase()}@kline_1m`);
       ws.onopen = ()=>setStatus('LIVE • Connected to Binance','#00ff88');
@@ -419,7 +468,6 @@
       macdChart.update('none');
     }
 
-    // ───── Historical & Ticker ─────
     async function fetchHistoricalData(){
       setStatus('Loading historical data...','#ffd700');
       const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${SYMBOL}&interval=1m&limit=100`);
@@ -439,7 +487,6 @@
       upd(); setInterval(upd,10000);
     }
 
-    // ───── UI helpers ─────
     function updateLivePrice(p){
       const ch = lastPrice?((p-lastPrice)/lastPrice)*100:0;
       const el = document.getElementById('livePrice');
@@ -486,7 +533,6 @@
     }
 
     function closeModal(){document.getElementById('tradeModal').style.display='none';}
-    function connectWallet(){alert('Wallet connected to live trading system');}
 
     // ───── Init ─────
     window.onload = async ()=>{
