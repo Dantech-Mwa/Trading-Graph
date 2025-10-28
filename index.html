@@ -3,106 +3,172 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Live BNB/USDT Chart - Real-Time</title>
+  <title>Elite Live Crypto Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1"></script>
   <style>
     :root {
-      --bg: #1a1a1a;
-      --card: #222;
-      --text: #eee;
-      --green: #00d4aa;
-      --red: #ff5252;
-      --border: #333;
-      --accent: #00aaff;
+      --bg: #0f0f1a;
+      --card: rgba(20, 20, 40, 0.7);
+      --glass: rgba(255, 255, 255, 0.05);
+      --text: #e0e0ff;
+      --green: #00ff88;
+      --red: #ff3b5c;
+      --accent: #00d4ff;
+      --gold: #ffd700;
+      --purple: #aa00ff;
+      --orange: #ff8800;
+      --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    [data-theme="light"] {
+      --bg: #f8f9ff;
+      --card: rgba(255, 255, 255, 0.9);
+      --glass: rgba(255, 255, 255, 0.7);
+      --text: #1a1a2e;
+      --green: #00c853;
+      --red: #d50000;
+      --accent: #2962ff;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: 'Inter', 'Segoe UI', sans-serif;
       padding: 12px;
-      line-height: 1.5;
+      transition: var(--transition);
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
     }
+    [data-theme="light"] body { background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
     .container { max-width: 1400px; margin: 0 auto; }
-    h1 { 
-      text-align: center; 
-      font-size: clamp(1.3rem, 4vw, 1.8rem); 
-      margin-bottom: 8px; 
+    .header {
+      text-align: center;
+      margin-bottom: 16px;
+      backdrop-filter: blur(10px);
+      background: var(--glass);
+      border-radius: 16px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    h1 {
+      font-size: clamp(1.4rem, 5vw, 2rem);
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--green), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
     }
     .ticker {
-      text-align: center;
-      font-size: clamp(1.5rem, 5vw, 2rem);
-      font-weight: bold;
-      margin: 8px 0;
-      color: var(--green);
+      font-size: clamp(1.6rem, 6vw, 2.4rem);
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-shadow: 0 0 20px rgba(0,212,170,0.5);
+      animation: pulse 2s infinite;
     }
-    .status { 
-      text-align: center; 
-      font-size: 0.85rem; 
-      color: #aaa; 
-      margin-bottom: 12px; 
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+    }
+    .status {
+      font-size: 0.9rem;
+      color: var(--accent);
+      font-weight: 500;
     }
     .chart-box {
       background: var(--card);
+      border-radius: 20px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      position: relative;
+      overflow: hidden;
+    }
+    .chart-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--green), var(--accent), var(--purple));
+      animation: shimmer 3s infinite;
+    }
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    canvas {
+      width: 100% !important;
+      height: 280px !important;
       border-radius: 12px;
+    }
+    .marquee {
+      background: var(--glass);
       padding: 12px;
-      margin-bottom: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      border-radius: 16px;
+      overflow: hidden;
+      white-space: nowrap;
+      font-size: 0.95rem;
+      margin: 16px 0;
+      border: 1px solid rgba(255,255,255,0.1);
     }
-    canvas { 
-      width: 100% !important; 
-      height: 260px !important; 
-      border-radius: 8px; 
+    .marquee-content {
+      display: inline-block;
+      animation: scroll 30s linear infinite;
     }
-    .assets-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 10px;
-      margin-top: 16px;
+    @keyframes scroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
     }
-    .asset {
-      background: var(--card);
-      padding: 10px;
-      border-radius: 8px;
-      text-align: center;
-      font-size: 0.85rem;
+    .asset-item {
+      display: inline-block;
+      margin-right: 32px;
+      font-weight: 600;
     }
-    .asset-name { font-weight: bold; color: #ccc; font-size: 0.9rem; }
-    .asset-price { font-size: 1rem; font-weight: bold; }
+    .asset-name { color: var(--gold); }
+    .asset-price { color: var(--text); }
     .asset-change { font-size: 0.8rem; }
     .footer {
       text-align: center;
       margin: 24px 0 12px;
-      font-size: 0.75rem;
-      color: #666;
+      font-size: 0.8rem;
+      color: #888;
+      font-style: italic;
     }
-    /* Mobile: Reduce padding */
-    @media (max-width: 600px) {
-      body { padding: 8px; }
-      .chart-box { padding: 10px; margin-bottom: 10px; }
+    /* Mobile */
+    @media (max-width: 768px) {
+      .chart-box { padding: 12px; margin-bottom: 12px; }
       canvas { height: 200px !important; }
-      .assets-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-      .asset { padding: 8px; font-size: 0.8rem; }
+      .marquee { font-size: 0.85rem; }
+      .asset-item { margin-right: 20px; }
+    }
+    @media (max-width: 480px) {
+      canvas { height: 180px !important; }
     }
   </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
-    <h1>Live BNB/USDT (1H)</h1>
-    <div class="ticker" id="livePrice">Loading...</div>
-    <div class="status" id="status">Connecting to Binance...</div>
+    <div class="header">
+      <h1>Elite Live Crypto Dashboard</h1>
+      <div class="ticker" id="livePrice">Loading...</div>
+      <div class="status" id="status">Initializing elite systems...</div>
+    </div>
 
     <div class="chart-box"><canvas id="priceChart"></canvas></div>
     <div class="chart-box"><canvas id="volumeChart"></canvas></div>
     <div class="chart-box"><canvas id="rsiChart"></canvas></div>
     <div class="chart-box"><canvas id="macdChart"></canvas></div>
 
-    <div class="assets-grid" id="assetsGrid"></div>
+    <div class="marquee">
+      <div class="marquee-content" id="tickerTape"></div>
+    </div>
 
     <div class="footer">
-      Binance WebSocket • EMA(9) WMA(20) HMA(21) • RSI(14) • MACD(12,26,9)
+      Real-time • Binance WebSocket • EMA(9) WMA(20) HMA(21) • RSI(14) • MACD(12,26,9) • Animated
     </div>
   </div>
 
@@ -112,6 +178,7 @@
     const INTERVAL = "1h";
     const LIMIT = 150;
     const MAX_POINTS = 200;
+    const SOUND_ENABLED = true;
 
     const ANCHOR_PRICES = {
       BTC: 51000, ETH: 2900, BNB: 350, ADA: 0.52,
@@ -119,13 +186,32 @@
       LTC: 72, LINK: 15.8
     };
 
-    // === DATA ARRAYS ===
-    let priceData = [], volumeData = [], rsiData = [], macdLine = [], signalLine = [], histogram = [];
+    // === DATA ===
+    let priceData = [], volumeData = [];
     let ema9 = [], wma20 = [], hma21 = [];
+    let rsiValues = [], macdLine = [], signalLine = [], histogram = [];
     let priceChart, volumeChart, rsiChart, macdChart;
     let wsKline, wsTickers;
+    let lastPrice = 0;
+    let audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-    // === INDICATOR: EMA ===
+    // === SOUND ALERT ===
+    function playChime() {
+      if (!SOUND_ENABLED) return;
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      osc.frequency.value = 800;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0, audioContext.currentTime);
+      gain.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      osc.start();
+      osc.stop(audioContext.currentTime + 0.3);
+    }
+
+    // === INDICATORS (same as before, optimized) ===
     function calculateEMA(data, period) {
       const k = 2 / (period + 1);
       let ema = data[0].c;
@@ -137,7 +223,6 @@
       return result;
     }
 
-    // === INDICATOR: WMA ===
     function calculateWMA(data, period) {
       const weights = Array.from({length: period}, (_, i) => i + 1);
       const sumWeights = weights.reduce((a,b) => a+b, 0);
@@ -152,7 +237,6 @@
       return result;
     }
 
-    // === INDICATOR: HMA ===
     function calculateHMA(data, period) {
       const half = Math.floor(period / 2);
       const sqrtP = Math.floor(Math.sqrt(period));
@@ -162,7 +246,6 @@
       return calculateWMA(diff.map((v, i) => ({c: v, x: data[i + half].x})), sqrtP);
     }
 
-    // === INDICATOR: RSI ===
     function calculateRSI(data, period = 14) {
       if (data.length < period + 1) return [];
       let gains = 0, losses = 0;
@@ -174,7 +257,6 @@
       let avgGain = gains / period;
       let avgLoss = losses / period;
       const rsi = [100 - (100 / (1 + avgGain / (avgLoss || 1)))];
-      
       for (let i = period + 1; i < data.length; i++) {
         const diff = data[i].c - data[i-1].c;
         const gain = diff > 0 ? diff : 0;
@@ -186,7 +268,6 @@
       return rsi;
     }
 
-    // === INDICATOR: MACD ===
     function calculateMACD(data, fast = 12, slow = 26, signal = 9) {
       const emaFast = calculateEMA(data, fast);
       const emaSlow = calculateEMA(data, slow);
@@ -196,29 +277,27 @@
       return { macd: macd.slice(-signalLine.length), signal: signalLine, histogram };
     }
 
-    // === CHART INIT ===
+    // === CHARTS ===
     function initCharts() {
-      const commonOpts = {
-        animation: false,
+      const common = {
+        animation: { duration: 800, easing: 'easeOutQuart' },
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: { x: { type: 'time', time: { unit: 'hour' }, ticks: { color: '#ccc' }, grid: { color: '#333' } } }
+        scales: { x: { type: 'time', time: { unit: 'hour' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa' } } }
       };
 
-      // Price + MAs
       priceChart = new Chart(document.getElementById('priceChart'), {
         type: 'candlestick',
         data: { datasets: [
-          { label: 'Price', data: priceData, borderColor: 'rgba(0,212,170,1)' },
-          { label: 'EMA(9)', data: [], borderColor: '#00ff88', borderWidth: 1.5, type: 'line', pointRadius: 0 },
-          { label: 'WMA(20)', data: [], borderColor: '#ffaa00', borderWidth: 1.5, type: 'line', pointRadius: 0 },
-          { label: 'HMA(21)', data: [], borderColor: '#ff00ff', borderWidth: 2, type: 'line', pointRadius: 0 }
+          { label: 'Price', data: priceData, borderColor: 'rgba(0,212,170,1)', backgroundColor: 'rgba(0,212,170,0.1)' },
+          { label: 'EMA(9)', data: [], borderColor: '#00ff88', borderWidth: 2, type: 'line', pointRadius: 0, tension: 0.1 },
+          { label: 'WMA(20)', data: [], borderColor: '#ffaa00', borderWidth: 2, type: 'line', pointRadius: 0, tension: 0.1 },
+          { label: 'HMA(21)', data: [], borderColor: '#ff00ff', borderWidth: 2.5, type: 'line', pointRadius: 0, tension: 0.1 }
         ]},
-        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { position: 'right', ticks: { color: '#ccc' } } } }
+        options: { ...common, scales: { ...common.scales, y: { position: 'right', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa' } } } }
       });
 
-      // Volume
       volumeChart = new Chart(document.getElementById('volumeChart'), {
         type: 'bar',
         data: { datasets: [{ data: volumeData, backgroundColor: ctx => {
@@ -226,74 +305,62 @@
           const prev = priceData[i-1]?.c, curr = priceData[i]?.c;
           return curr >= prev ? 'rgba(0,200,100,0.7)' : 'rgba(255,80,80,0.7)';
         }}]},
-        options: { ...commonOpts, scales: { ...commonOpts.scales, x: { display: false } } }
+        options: { ...common, scales: { ...common.scales, x: { display: false } } }
       });
 
-      // RSI
       rsiChart = new Chart(document.getElementById('rsiChart'), {
         type: 'line',
         data: { datasets: [
-          { label: 'RSI', data: [], borderColor: '#aa00ff', fill: false, tension: 0.1 },
-          { label: '70', data: [], borderColor: '#ff5252', borderDash: [5], pointRadius: 0 },
-          { label: '30', data: [], borderColor: '#00d4aa', borderDash: [5], pointRadius: 0 }
+          { label: 'RSI', data: [], borderColor: '#aa00ff', fill: true, backgroundColor: 'rgba(170,0,255,0.1)', tension: 0.3 },
+          { data: [], borderColor: '#ff5252', borderDash: [5], pointRadius: 0 },
+          { data: [], borderColor: '#00d4aa', borderDash: [5], pointRadius: 0 }
         ]},
-        options: { ...commonOpts, scales: { x: { display: false }, y: { min: 0, max: 100 } } }
+        options: { ...common, scales: { x: { display: false }, y: { min: 0, max: 100 } } }
       });
 
-      // MACD
       macdChart = new Chart(document.getElementById('macdChart'), {
         type: 'bar',
         data: { datasets: [
-          { label: 'Histogram', data: [], backgroundColor: ctx => ctx.raw.y >= 0 ? '#00d4aa' : '#ff5252' },
-          { label: 'MACD', data: [], borderColor: '#00aaff', type: 'line', pointRadius: 0 },
-          { label: 'Signal', data: [], borderColor: '#ffaa00', type: 'line', pointRadius: 0 }
+          { label: 'Histogram', data: [], backgroundColor: ctx => ctx.raw.y >= 0 ? '#00d4aa' : '#ff5252', borderRadius: 2 },
+          { label: 'MACD', data: [], borderColor: '#00aaff', type: 'line', pointRadius: 0, tension: 0.2 },
+          { label: 'Signal', data: [], borderColor: '#ffaa00', type: 'line', pointRadius: 0, tension: 0.2 }
         ]},
-        options: { ...commonOpts, scales: { x: { display: false }, y: { ticks: { color: '#ccc' }, grid: { color: '#333' } } } }
+        options: { ...common, scales: { x: { display: false } } }
       });
     }
 
-    // === UPDATE ALL INDICATORS ===
+    // === UPDATE INDICATORS WITH ANIMATION ===
     function updateIndicators() {
       if (priceData.length < 35) return;
-
       const closes = priceData.map(d => ({c: d.c, x: d.x}));
 
-      // MAs
       ema9 = calculateEMA(closes, 9).map((v, i) => ({x: closes[i].x, y: v}));
       wma20 = calculateWMA(closes, 20).map((v, i) => ({x: closes[i + 19].x, y: v}));
       hma21 = calculateHMA(closes, 21).map((v, i) => ({x: closes[i + 20].x, y: v}));
-
-      // RSI
-      const rsiValues = calculateRSI(closes, 14).map((v, i) => ({x: closes[i + 14].x, y: v}));
-
-      // MACD
+      const rsi = calculateRSI(closes, 14).map((v, i) => ({x: closes[i + 14].x, y: v}));
       const { macd, signal, histogram: hist } = calculateMACD(closes, 12, 26, 9);
       const macdX = closes.slice(-hist.length).map(d => d.x);
       macdLine = macd.map((v, i) => ({x: macdX[i], y: v}));
       signalLine = signal.map((v, i) => ({x: macdX[i], y: v}));
       histogram = hist.map((v, i) => ({x: macdX[i], y: v}));
 
-      // Update charts
+      // Animate updates
       priceChart.data.datasets[1].data = ema9;
       priceChart.data.datasets[2].data = wma20;
       priceChart.data.datasets[3].data = hma21;
-
-      rsiChart.data.datasets[0].data = rsiValues;
-      rsiChart.data.datasets[1].data = rsiValues.map(d => ({x: d.x, y: 70}));
-      rsiChart.data.datasets[2].data = rsiValues.map(d => ({x: d.x, y: 30}));
-
+      rsiChart.data.datasets[0].data = rsi;
+      rsiChart.data.datasets[1].data = rsi.map(d => ({x: d.x, y: 70}));
+      rsiChart.data.datasets[2].data = rsi.map(d => ({x: d.x, y: 30}));
       macdChart.data.datasets[0].data = histogram;
       macdChart.data.datasets[1].data = macdLine;
       macdChart.data.datasets[2].data = signalLine;
 
-      priceChart.update('quiet');
-      rsiChart.update('quiet');
-      macdChart.update('quiet');
+      [priceChart, rsiChart, macdChart].forEach(c => c.update('active'));
     }
 
     // === LOAD HISTORICAL ===
     async function loadHistorical() {
-      setStatus('Loading historical data...', '#ffeb3b');
+      setStatus('Fetching elite data...', '#ffd700');
       try {
         const url = `https://api.binance.com/api/v3/klines?symbol=${MAIN_SYMBOL}&interval=${INTERVAL}&limit=${LIMIT}`;
         const res = await fetch(url);
@@ -308,22 +375,23 @@
 
         priceChart.data.datasets[0].data = priceData;
         volumeChart.data.datasets[0].data = volumeData;
-        priceChart.update('quiet');
-        volumeChart.update('quiet');
+        priceChart.update();
+        volumeChart.update();
 
         updateIndicators();
-        updateLivePrice(priceData[priceData.length - 1].c);
-        setStatus('Live • Real-time updates', '#00d4aa');
+        lastPrice = priceData[priceData.length - 1].c;
+        updateLivePrice(lastPrice);
+        setStatus('LIVE • Elite Mode Active', '#00ff88');
       } catch (err) {
-        setStatus('Retry in 5s...', '#ff5252');
+        setStatus('Retrying...', '#ff5252');
         setTimeout(loadHistorical, 5000);
       }
     }
 
-    // === WEBSOCKET: KLINE ===
+    // === WEBSOCKETS ===
     function connectKline() {
       wsKline = new WebSocket(`wss://stream.binance.com:9443/ws/${MAIN_SYMBOL.toLowerCase()}@kline_${INTERVAL}`);
-      wsKline.onopen = () => console.log('Kline connected');
+      wsKline.onopen = () => console.log('Elite Kline connected');
       wsKline.onmessage = (e) => {
         const msg = JSON.parse(e.data);
         const k = msg.k;
@@ -348,16 +416,16 @@
 
           updateIndicators();
           updateLivePrice(candle.c);
+          playChime();
         }
       };
       wsKline.onclose = () => setTimeout(connectKline, 3000);
     }
 
-    // === WEBSOCKET: TICKERS ===
     function connectTickers() {
       const streams = Object.keys(ANCHOR_PRICES).map(s => `${s.toLowerCase()}usdt@miniTicker`).join('/');
       wsTickers = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
-      wsTickers.onopen = () => console.log('Tickers connected');
+      wsTickers.onopen = () => console.log('Ticker stream active');
       wsTickers.onmessage = (e) => {
         const data = JSON.parse(e.data).data;
         if (!data || !data.s) return;
@@ -365,24 +433,39 @@
         if (!ANCHOR_PRICES[sym]) return;
         const price = parseFloat(data.c);
         const change = ((price - ANCHOR_PRICES[sym]) / ANCHOR_PRICES[sym]) * 100;
-        const el = document.getElementById(`${sym}-price`);
-        const ch = document.getElementById(`${sym}-change`);
-        if (el && ch) {
-          el.textContent = `$${price.toFixed(sym === 'ADA' || sym === 'DOGE' ? 4 : 2)}`;
-          ch.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-          ch.style.color = change >= 0 ? '#00d4aa' : '#ff5252';
-        }
+        updateMarquee(sym, price, change);
       };
       wsTickers.onclose = () => setTimeout(connectTickers, 3000);
     }
 
-    // === UI ===
+    // === MARQUEE ===
+    function updateMarquee(sym, price, change) {
+      const el = document.getElementById(`marquee-${sym}`);
+      if (!el) {
+        const item = document.createElement('span');
+        item.id = `marquee-${sym}`;
+        item.className = 'asset-item';
+        item.innerHTML = `<span class="asset-name">${sym}</span> <span class="asset-price">$${price.toFixed(sym === 'ADA' || sym === 'DOGE' ? 4 : 2)}</span> <span class="asset-change" style="color:${change >= 0 ? '#00ff88' : '#ff5252'}">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</span> `;
+        document.getElementById('tickerTape').appendChild(item);
+        document.getElementById('tickerTape').appendChild(item.cloneNode(true)); // for seamless loop
+      } else {
+        el.querySelector('.asset-price').textContent = `$${price.toFixed(sym === 'ADA' || sym === 'DOGE' ? 4 : 2)}`;
+        const ch = el.querySelector('.asset-change');
+        ch.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+        ch.style.color = change >= 0 ? '#00ff88' : '#ff5252';
+      }
+    }
+
     function updateLivePrice(price) {
-      const ref = ANCHOR_PRICES.BNB;
-      const change = ((price - ref) / ref) * 100;
+      const change = ((price - ANCHOR_PRICES.BNB) / ANCHOR_PRICES.BNB) * 100;
       const el = document.getElementById('livePrice');
       el.textContent = `$${price.toFixed(2)} ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-      el.style.color = change >= 0 ? '#00d4aa' : '#ff5252';
+      el.style.color = change >= 0 ? '#00ff88' : '#ff5252';
+      if (Math.abs(price - lastPrice) > 0.01) {
+        el.style.transform = 'scale(1.05)';
+        setTimeout(() => el.style.transform = 'scale(1)', 200);
+      }
+      lastPrice = price;
     }
 
     function setStatus(msg, color) {
@@ -391,20 +474,16 @@
       el.style.color = color;
     }
 
-    function renderAssets() {
-      const grid = document.getElementById('assetsGrid');
-      grid.innerHTML = Object.entries(ANCHOR_PRICES).map(([sym]) => `
-        <div class="asset">
-          <div class="asset-name">${sym}/USDT</div>
-          <div class="asset-price" id="${sym}-price">—</div>
-          <div class="asset-change" id="${sym}-change">—</div>
-        </div>
-      `).join('');
+    // === THEME ===
+    function detectTheme() {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
     }
 
     // === START ===
     window.onload = () => {
-      renderAssets();
+      detectTheme();
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', detectTheme);
       initCharts();
       loadHistorical().then(() => {
         connectKline();
