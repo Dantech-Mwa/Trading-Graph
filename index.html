@@ -247,310 +247,269 @@
   </div>
 
   <script>
-    // === CONFIG ===
-    const MAIN_SYMBOL = "BNBUSDT";
-    const INTERVAL = "1h";
-    const LIMIT = 150;
-    const MAX_POINTS = 200;
+  // ──────────────────────────────────────────────────────────────
+  // CONFIG
+  // ──────────────────────────────────────────────────────────────
+  const MAIN_SYMBOL   = "BNBUSDT";
+  const INTERVAL      = "1h";
+  const LIMIT         = 150;               // candles for volume/RSI/MACD
+  const POLL_PRICE_MS = 5000;              // live price
+  const POLL_TICKER_MS= 10000;             // 10-crypto marquee
+  const POLL_NFT_MS   = 60000;             // NFT floor prices
 
-    const ANCHOR_PRICES = {
-      BTC: 51000, ETH: 2900, BNB: 350, ADA: 0.52,
-      SOL: 105, DOT: 7.2, DOGE: 0.12, XRP: 0.58,
-      LTC: 72, LINK: 15.8
+  const ANCHOR_PRICES = {
+    BTC:51000, ETH:2900, BNB:350, ADA:0.52,
+    SOL:105,   DOT:7.2,  DOGE:0.12, XRP:0.58,
+    LTC:72,    LINK:15.8
+  };
+
+  const NFT_COLLECTIONS = ['boredapeyachtclub','cryptopunks','azuki'];
+
+  // ──────────────────────────────────────────────────────────────
+  // STATE
+  // ──────────────────────────────────────────────────────────────
+  let priceData   = [];   // [{x, o, h, l, c}]
+  let volumeData  = [];   // [{x, y}]
+  let lastPrice   = 0;
+  let volumeChart, rsiChart, macdChart;
+
+  // ──────────────────────────────────────────────────────────────
+  // INDICATOR HELPERS (unchanged – only used on the fetched candles)
+  // ──────────────────────────────────────────────────────────────
+  const ema = (data, period) => {
+    const k = 2/(period+1); let v = data[0].c;
+    const out = [v];
+    for (let i=1;i<data.length;i++) { v = data[i].c*k + v*(1-k); out.push(v); }
+    return out;
+  };
+  const wma = (data, period) => {
+    const w = Array.from({length:period},(_,i)=>i+1);
+    const sumW = w.reduce((a,b)=>a+b,0);
+    const out = [];
+    for (let i=period-1;i<data.length;i++) {
+      let s=0; for (let j=0;j<period;j++) s += data[i-j].c * w[j];
+      out.push(s/sumW);
+    }
+    return out;
+  };
+  const rsi = (data, period=14) => {
+    if (data.length < period+1) return [];
+    let g=0,l=0;
+    for (let i=1;i<=period;i++){ const d=data[i].c-data[i-1].c; d>0?g+=d:l-=d; }
+    let ag=g/period, al=l/period;
+    const out = [100-(100/(1+ag/(al||1)))];
+    for (let i=period+1;i<data.length;i++){
+      const d=data[i].c-data[i-1].c;
+      const gain = d>0?d:0, loss = d<0?-d:0;
+      ag = (ag*(period-1)+gain)/period;
+      al = (al*(period-1)+loss)/period;
+      out.push(100-(100/(1+ag/(al||1))));
+    }
+    return out;
+  };
+  const macd = (data, fast=12, slow=26, sig=9) => {
+    const ef = ema(data,fast), es = ema(data,slow);
+    const m = ef.slice(-es.length).map((v,i)=>v-es[i]);
+    const signal = ema(m.map((v,i)=>({c:v,x:data[i+slow].x})),sig);
+    const hist = signal.map((v,i)=>m[i+slow-fast]-v);
+    return {macd:m.slice(-signal.length), signal, hist};
+  };
+
+  // ──────────────────────────────────────────────────────────────
+  // CHART.JS INITIALISATION (volume / RSI / MACD)
+  // ──────────────────────────────────────────────────────────────
+  function initSubCharts() {
+    const common = {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      animation:false
     };
+    volumeChart = new Chart('volumeChart',{
+      type:'bar', data:{datasets:[{data:[]}]}, options:common
+    });
+    rsiChart = new Chart('rsiChart',{
+      type:'line', data:{datasets:[
+        {data:[],borderColor:'#aa00ff',fill:true,backgroundColor:'rgba(170,0,255,0.1)',tension:.3},
+        {data:[],borderDash:[5],pointRadius:0},
+        {data:[],borderDash:[5],pointRadius:0}
+      ]}, options:{...common, scales:{y:{min:0,max:100}}}
+    });
+    macdChart = new Chart('macdChart',{
+      type:'bar', data:{datasets:[
+        {data:[],backgroundColor:c=>c.raw.y>=0?'#00d4aa':'#ff5252'},
+        {data:[],type:'line',borderColor:'#00aaff',pointRadius:0},
+        {data:[],type:'line',borderColor:'#ffaa00',pointRadius:0}
+      ]}, options:common
+    });
+  }
 
-    const NFT_COLLECTIONS = ['boredapeyachtclub', 'cryptopunks', 'azuki']; // CoinGecko IDs
+  // ──────────────────────────────────────────────────────────────
+  // LOAD HISTORICAL CANDLES (once – HTTPS)
+  // ──────────────────────────────────────────────────────────────
+  async function loadHistorical() {
+    setStatus('Fetching candles…','#ffd700');
+    try{
+      const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${MAIN_SYMBOL}&interval=${INTERVAL}&limit=${LIMIT}`);
+      const klines = await r.json();
 
-    // === DATA & CHARTS (Volume, RSI, MACD remain custom) ===
-    let volumeData = [], rsiValues = [], macdLine = [], signalLine = [], histogram = [];
-    let volumeChart, rsiChart, macdChart;
-    let wsKline, wsTickers, wsNFT;
-    let lastPrice = 0;
-    let nftData = {};
+      priceData = klines.map(k=>({
+        x:new Date(k[0]),
+        o:+k[1], h:+k[2], l:+k[3], c:+k[4]
+      }));
+      volumeData = klines.map(k=>({x:new Date(k[0]), y:+k[5]}));
 
-    // === INDICATORS (EMA, WMA, HMA, RSI, MACD - same as before) ===
-    function calculateEMA(data, period) {
-      const k = 2 / (period + 1);
-      let ema = data[0].c;
-      const result = [ema];
-      for (let i = 1; i < data.length; i++) {
-        ema = data[i].c * k + ema * (1 - k);
-        result.push(ema);
-      }
-      return result;
+      // volume
+      volumeChart.data.datasets[0].data = volumeData;
+      volumeChart.update();
+
+      // RSI
+      const rsiVals = rsi(priceData,14).map((v,i)=>({x:priceData[i+14].x, y:v}));
+      rsiChart.data.datasets[0].data = rsiVals;
+      rsiChart.data.datasets[1].data = rsiVals.map(d=>({x:d.x,y:70}));
+      rsiChart.data.datasets[2].data = rsiVals.map(d=>({x:d.x,y:30}));
+      rsiChart.update();
+
+      // MACD
+      const {macd:ml, signal:sl, hist:hist} = macd(priceData);
+      const macdX = priceData.slice(-hist.length).map(d=>d.x);
+      macdChart.data.datasets[0].data = hist.map((v,i)=>({x:macdX[i],y:v}));
+      macdChart.data.datasets[1].data = ml.map((v,i)=>({x:macdX[i],y:v}));
+      macdChart.data.datasets[2].data = sl.map((v,i)=>({x:macdX[i],y:v}));
+      macdChart.update();
+
+      lastPrice = priceData[priceData.length-1].c;
+      updateLivePrice(lastPrice);
+      setStatus('LIVE • All systems active','#00ff88');
+    }catch(e){
+      setStatus('Retry in 5 s…','#ff5252');
+      setTimeout(loadHistorical,5000);
     }
+  }
 
-    function calculateWMA(data, period) {
-      const weights = Array.from({length: period}, (_, i) => i + 1);
-      const sumWeights = weights.reduce((a,b) => a+b, 0);
-      const result = [];
-      for (let i = period - 1; i < data.length; i++) {
-        let sum = 0;
-        for (let j = 0; j < period; j++) {
-          sum += data[i - j].c * weights[j];
-        }
-        result.push(sum / sumWeights);
-      }
-      return result;
-    }
+  // ──────────────────────────────────────────────────────────────
+  // LIVE BNB PRICE (polling fallback)
+  // ──────────────────────────────────────────────────────────────
+  function startLivePrice() {
+    const poll = async () => {
+      try{
+        const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${MAIN_SYMBOL}`);
+        const d = await r.json();
+        updateLivePrice(+d.price);
+      }catch(e){/* ignore */ }
+    };
+    poll(); setInterval(poll,POLL_PRICE_MS);
+  }
 
-    function calculateHMA(data, period) {
-      const half = Math.floor(period / 2);
-      const sqrtP = Math.floor(Math.sqrt(period));
-      const wmaHalf = calculateWMA(data, half);
-      const wmaFull = calculateWMA(data, period);
-      const diff = wmaHalf.slice(-wmaFull.length).map((v, i) => v * 2 - wmaFull[i]);
-      return calculateWMA(diff.map((v, i) => ({c: v, x: data[i + half].x})), sqrtP);
-    }
-
-    function calculateRSI(data, period = 14) {
-      if (data.length < period + 1) return [];
-      let gains = 0, losses = 0;
-      for (let i = 1; i <= period; i++) {
-        const diff = data[i].c - data[i-1].c;
-        if (diff > 0) gains += diff;
-        else losses -= diff;
-      }
-      let avgGain = gains / period;
-      let avgLoss = losses / period;
-      const rsi = [100 - (100 / (1 + avgGain / (avgLoss || 1)))];
-      for (let i = period + 1; i < data.length; i++) {
-        const diff = data[i].c - data[i-1].c;
-        const gain = diff > 0 ? diff : 0;
-        const loss = diff < 0 ? -diff : 0;
-        avgGain = (avgGain * (period - 1) + gain) / period;
-        avgLoss = (avgLoss * (period - 1) + loss) / period;
-        rsi.push(100 - (100 / (1 + avgGain / (avgLoss || 1))));
-      }
-      return rsi;
-    }
-
-    function calculateMACD(data, fast = 12, slow = 26, signal = 9) {
-      const emaFast = calculateEMA(data, fast);
-      const emaSlow = calculateEMA(data, slow);
-      const macd = emaFast.slice(-emaSlow.length).map((v, i) => v - emaSlow[i]);
-      const signalLine = calculateEMA(macd.map((v, i) => ({c: v, x: data[i + slow].x})), signal);
-      const histogram = signalLine.map((v, i) => macd[i + slow - fast] - v);
-      return { macd: macd.slice(-signalLine.length), signal: signalLine, histogram };
-    }
-
-    // === INIT SUB-CHARTS ===
-    function initSubCharts() {
-      const common = {
-        animation: { duration: 800, easing: 'easeOutQuart' },
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { type: 'time', time: { unit: 'hour' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa' } } }
-      };
-
-      volumeChart = new Chart(document.getElementById('volumeChart'), {
-        type: 'bar',
-        data: { datasets: [{ data: volumeData, backgroundColor: ctx => {
-          const i = ctx.dataIndex;
-          const prev = priceData[i-1]?.c, curr = priceData[i]?.c;
-          return curr >= prev ? 'rgba(0,200,100,0.7)' : 'rgba(255,80,80,0.7)';
-        }}]},
-        options: { ...common, scales: { ...common.scales, x: { display: false } } }
-      });
-
-      rsiChart = new Chart(document.getElementById('rsiChart'), {
-        type: 'line',
-        data: { datasets: [
-          { label: 'RSI', data: [], borderColor: '#aa00ff', fill: true, backgroundColor: 'rgba(170,0,255,0.1)', tension: 0.3 },
-          { data: [], borderColor: '#ff5252', borderDash: [5], pointRadius: 0 },
-          { data: [], borderColor: '#00d4aa', borderDash: [5], pointRadius: 0 }
-        ]},
-        options: { ...common, scales: { x: { display: false }, y: { min: 0, max: 100 } } }
-      });
-
-      macdChart = new Chart(document.getElementById('macdChart'), {
-        type: 'bar',
-        data: { datasets: [
-          { label: 'Histogram', data: [], backgroundColor: ctx => ctx.raw.y >= 0 ? '#00d4aa' : '#ff5252', borderRadius: 2 },
-          { label: 'MACD', data: [], borderColor: '#00aaff', type: 'line', pointRadius: 0, tension: 0.2 },
-          { label: 'Signal', data: [], borderColor: '#ffaa00', type: 'line', pointRadius: 0, tension: 0.2 }
-        ]},
-        options: { ...common, scales: { x: { display: false } } }
-      });
-    }
-
-    // === LOAD HISTORICAL (for sub-charts) ===
-    async function loadHistorical() {
-      setStatus('Fetching elite data...', '#ffd700');
-      try {
-        const url = `https://api.binance.com/api/v3/klines?symbol=${MAIN_SYMBOL}&interval=${INTERVAL}&limit=${LIMIT}`;
-        const res = await fetch(url);
-        const klines = await res.json();
-
-        const priceData = klines.map(k => ({
-          x: new Date(k[0]),
-          o: parseFloat(k[1]), h: parseFloat(k[2]),
-          l: parseFloat(k[3]), c: parseFloat(k[4])
-        }));
-        volumeData = klines.map(k => ({ x: new Date(k[0]), y: parseFloat(k[5]) }));
-
-        volumeChart.data.datasets[0].data = volumeData;
-        volumeChart.update();
-
-        // Update RSI/MACD (simplified, as main chart is TV)
-        const closes = priceData.map(d => ({c: d.c, x: d.x}));
-        const rsi = calculateRSI(closes, 14).map((v, i) => ({x: closes[i + 14].x, y: v}));
-        rsiChart.data.datasets[0].data = rsi;
-        rsiChart.data.datasets[1].data = rsi.map(d => ({x: d.x, y: 70}));
-        rsiChart.data.datasets[2].data = rsi.map(d => ({x: d.x, y: 30}));
-        rsiChart.update();
-
-        const { macd, signal, histogram: hist } = calculateMACD(closes, 12, 26, 9);
-        const macdX = closes.slice(-hist.length).map(d => d.x);
-        macdLine = macd.map((v, i) => ({x: macdX[i], y: v}));
-        signalLine = signal.map((v, i) => ({x: macdX[i], y: v}));
-        histogram = hist.map((v, i) => ({x: macdX[i], y: v}));
-        macdChart.data.datasets[0].data = histogram;
-        macdChart.data.datasets[1].data = macdLine;
-        macdChart.data.datasets[2].data = signalLine;
-        macdChart.update();
-
-        lastPrice = priceData[priceData.length - 1].c;
-        updateLivePrice(lastPrice);
-        setStatus('LIVE • Pro Mode Active', '#00ff88');
-      } catch (err) {
-        setStatus('Retrying...', '#ff5252');
-        setTimeout(loadHistorical, 5000);
-      }
-    }
-
-    // === WEBSOCKET: KLINE (for sub-charts & price) ===
-    function connectKline() {
-      wsKline = new WebSocket(`wss://stream.binance.com:9443/ws/${MAIN_SYMBOL.toLowerCase()}@kline_${INTERVAL}`);
-      wsKline.onopen = () => console.log('Kline connected');
-      wsKline.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
-        const k = msg.k;
-        if (k && k.x) {
-          const candle = { x: new Date(k.t), c: parseFloat(k.c) };
-          volumeData.push({ x: candle.x, y: parseFloat(k.v) });
-          if (volumeData.length > MAX_POINTS) volumeData.shift();
-          volumeChart.data.datasets[0].data = volumeData;
-          volumeChart.update('active');
-
-          // Update RSI/MACD incrementally (simplified)
-          updateSubIndicators(candle);
-          updateLivePrice(candle.c);
-        }
-      };
-      wsKline.onclose = () => setTimeout(connectKline, 3000);
-    }
-
-    function updateSubIndicators(candle) {
-      // Placeholder for incremental updates - full recalc for simplicity
-      loadHistorical(); // Refresh sub-charts on new candle
-    }
-
-    // === WEBSOCKET: TICKERS ===
-    function connectTickers() {
-      const streams = Object.keys(ANCHOR_PRICES).map(s => `${s.toLowerCase()}usdt@miniTicker`).join('/');
-      wsTickers = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
-      wsTickers.onopen = () => console.log('Tickers connected');
-      wsTickers.onmessage = (e) => {
-        const data = JSON.parse(e.data).data;
-        if (!data || !data.s) return;
-        const sym = data.s.replace('USDT', '');
-        if (!ANCHOR_PRICES[sym]) return;
-        const price = parseFloat(data.c);
-        const change = ((price - ANCHOR_PRICES[sym]) / ANCHOR_PRICES[sym]) * 100;
-        updateMarquee(sym, price, change);
-      };
-      wsTickers.onclose = () => setTimeout(connectTickers, 3000);
-    }
-
-    // === NFT INTEGRATION via CoinGecko ===
-    async function fetchNFTs() {
-      try {
-        const res = await fetch(`https://api.coingecko.com/api/v3/simple/nft/price?ids=${NFT_COLLECTIONS.join(',')}&vs_currencies=usd`);
-        const data = await res.json();
-        Object.entries(data).forEach(([id, info]) => {
-          nftData[id] = info.usd_price;
-          const name = id.toUpperCase().replace(/([A-Z])/g, ' $1').trim();
-          const change = Math.random() * 10 - 5; // Simulated % change
-          if (change > 5) confetti({ particleCount: 50, spread: 70 });
-          updateMarquee(`${name}_NFT`, info.usd_price, change, true);
+  // ──────────────────────────────────────────────────────────────
+  // MARQUEE – 10 CRYPTOS (polling)
+  // ──────────────────────────────────────────────────────────────
+  function startCryptoTicker() {
+    const symbols = Object.keys(ANCHOR_PRICES).map(s=>`${s}USDT`).join('","');
+    const poll = async () => {
+      try{
+        const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=["${symbols}"]`);
+        const list = await r.json();
+        list.forEach(p=>{
+          const sym = p.symbol.replace('USDT','');
+          if(!ANCHOR_PRICES[sym]) return;
+          const change = ((p.price-ANCHOR_PRICES[sym])/ANCHOR_PRICES[sym])*100;
+          updateMarquee(sym, p.price, change);
         });
-      } catch (err) {
-        console.error('NFT fetch error:', err);
-      }
-      setTimeout(fetchNFTs, 60000); // Update every minute
-    }
-
-    // === MARQUEE ===
-    function updateMarquee(sym, price, change, isNFT = false) {
-      const el = document.getElementById(`marquee-${sym}`);
-      if (!el) {
-        const item = document.createElement('span');
-        item.id = `marquee-${sym}`;
-        item.className = `asset-item ${isNFT ? 'nft-item' : ''}`;
-        item.innerHTML = `<span class="asset-name">${sym}</span> <span class="asset-price">$${price.toFixed(isNFT ? 0 : (sym === 'ADA' || sym === 'DOGE' ? 4 : 2))}</span> <span class="asset-change" style="color:${change >= 0 ? '#00ff88' : '#ff5252'}">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</span> `;
-        document.getElementById('tickerTape').appendChild(item);
-        document.getElementById('tickerTape').appendChild(item.cloneNode(true));
-      } else {
-        el.querySelector('.asset-price').textContent = `$${price.toFixed(isNFT ? 0 : (sym === 'ADA' || sym === 'DOGE' ? 4 : 2))}`;
-        const ch = el.querySelector('.asset-change');
-        ch.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-        ch.style.color = change >= 0 ? '#00ff88' : '#ff5252';
-      }
-    }
-
-    function updateLivePrice(price) {
-      const change = ((price - ANCHOR_PRICES.BNB) / ANCHOR_PRICES.BNB) * 100;
-      const el = document.getElementById('livePrice');
-      el.textContent = `$${price.toFixed(2)} ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-      el.style.color = change >= 0 ? '#00ff88' : '#ff5252';
-      if (Math.abs(price - lastPrice) > 0.01) {
-        el.style.transform = 'scale(1.05)';
-        setTimeout(() => el.style.transform = 'scale(1)', 200);
-      }
-      lastPrice = price;
-    }
-
-    function setStatus(msg, color) {
-      const el = document.getElementById('status');
-      el.textContent = msg;
-      el.style.color = color;
-    }
-
-    // === TRADING BUTTONS & MODAL ===
-    function simulateTrade(action) {
-      document.getElementById('modalTitle').textContent = `${action.toUpperCase()} BNB Executed`;
-      document.getElementById('modalMessage').innerHTML = `Simulated ${action} on <a href="https://www.binance.com/en/trade/BNB_USDT" target="_blank">Binance</a>. For NFTs, check <a href="https://opensea.io/" target="_blank">OpenSea</a>.`;
-      document.getElementById('tradeModal').style.display = 'block';
-    }
-
-    function closeModal() {
-      document.getElementById('tradeModal').style.display = 'none';
-    }
-
-    function connectWallet() {
-      alert('MetaMask connected! (Demo) - Ready for trades & NFTs.');
-    }
-
-    // === THEME ===
-    function detectTheme() {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-    }
-
-    // === START ===
-    window.onload = () => {
-      detectTheme();
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', detectTheme);
-      initSubCharts();
-      loadHistorical().then(() => {
-        connectKline();
-        connectTickers();
-        fetchNFTs();
-      });
-      window.onclick = (e) => { if (e.target.classList.contains('modal')) closeModal(); };
+      }catch(e){/* ignore */ }
     };
-  </script>
+    poll(); setInterval(poll,POLL_TICKER_MS);
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // MARQUEE – NFT FLOOR PRICES (CoinGecko)
+  // ──────────────────────────────────────────────────────────────
+  function startNFTTicker() {
+    const poll = async () => {
+      try{
+        const r = await fetch(`https://api.coingecko.com/api/v3/nfts/markets?vs_currency=usd&ids=${NFT_COLLECTIONS.join(',')}`);
+        const list = await r.json();
+        list.forEach(n=>{
+          const name = n.name.split(' ')[0].toUpperCase();
+          const price = n.floor_price?.usd||0;
+          const change = (Math.random()*10-5);
+          updateMarquee(`${name}_NFT`, price, change, true);
+        });
+      }catch(e){/* ignore */ }
+    };
+    poll(); setInterval(poll,POLL_NFT_MS);
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // MARQUEE HELPER
+  // ──────────────────────────────────────────────────────────────
+  function updateMarquee(sym, price, change, isNFT=false){
+    let el = document.getElementById(`m-${sym}`);
+    if(!el){
+      el = document.createElement('span');
+      el.id = `m-${sym}`;
+      el.className = `asset-item ${isNFT?'nft-item':''}`;
+      document.getElementById('tickerTape').appendChild(el);
+      document.getElementById('tickerTape').appendChild(el.cloneNode(true));
+    }
+    const fmt = isNFT?0:(sym==='ADA'||sym==='DOGE'?4:2);
+    el.innerHTML = `<span class="asset-name">${sym}</span> <span class="asset-price">$${Number(price).toFixed(fmt)}</span> <span class="asset-change" style="color:${change>=0?'#00ff88':'#ff5252'}">${change>=0?'+' : ''}${change.toFixed(2)}%</span> `;
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // LIVE PRICE DISPLAY
+  // ──────────────────────────────────────────────────────────────
+  function updateLivePrice(p){
+    const change = ((p-ANCHOR_PRICES.BNB)/ANCHOR_PRICES.BNB)*100;
+    const el = document.getElementById('livePrice');
+    el.textContent = `$${p.toFixed(2)} ${change>=0?'+' : ''}${change.toFixed(2)}%`;
+    el.style.color = change>=0?'#00ff88':'#ff5252';
+    if(Math.abs(p-lastPrice)>0.01){
+      el.style.transform='scale(1.05)';
+      setTimeout(()=>el.style.transform='scale(1)',200);
+    }
+    lastPrice = p;
+  }
+
+  function setStatus(txt,col){
+    const el = document.getElementById('status');
+    el.textContent = txt;
+    el.style.color = col;
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // TRADE BUTTONS / MODAL / CONFIRM
+  // ──────────────────────────────────────────────────────────────
+  function simulateTrade(action){
+    confetti({particleCount:100,spread:70,origin:{y:.6}});
+    document.getElementById('modalTitle').textContent = `${action.toUpperCase()} BNB Executed`;
+    document.getElementById('modalMessage').innerHTML = `Simulated ${action} on <a href="https://www.binance.com/en/trade/BNB_USDT" target="_blank">Binance</a>.`;
+    document.getElementById('tradeModal').style.display='block';
+  }
+  function closeModal(){ document.getElementById('tradeModal').style.display='none'; }
+  function connectWallet(){ alert('MetaMask connected (demo)'); }
+
+  // ──────────────────────────────────────────────────────────────
+  // THEME DETECTION
+  // ──────────────────────────────────────────────────────────────
+  function detectTheme(){
+    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', dark?'dark':'light');
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // BOOTSTRAP
+  // ──────────────────────────────────────────────────────────────
+  window.onload = () => {
+    detectTheme();
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',detectTheme);
+    initSubCharts();
+    loadHistorical().then(()=>{
+      startLivePrice();
+      startCryptoTicker();
+      startNFTTicker();
+    });
+    window.onclick = e=>{ if(e.target.classList.contains('modal')) closeModal(); };
+  };
+</script>
 </body>
 </html>
