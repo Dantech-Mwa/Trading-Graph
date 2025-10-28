@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Live BNB/USDT Chart - Real-Time</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1"></script>
+  <style>
+    :root {
+      --bg: #1a1a1a;
+      --card: #222;
+      --text: #eee;
+      --green: #00d4aa;
+      --red: #ff5252;
+      --border: #333;
+      --accent: #00aaff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 12px;
+      line-height: 1.5;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    h1 { 
+      text-align: center; 
+      font-size: clamp(1.3rem, 4vw, 1.8rem); 
+      margin-bottom: 8px; 
+    }
+    .ticker {
+      text-align: center;
+      font-size: clamp(1.5rem, 5vw, 2rem);
+      font-weight: bold;
+      margin: 8px 0;
+      color: var(--green);
+    }
+    .status { 
+      text-align: center; 
+      font-size: 0.85rem; 
+      color: #aaa; 
+      margin-bottom: 12px; 
+    }
+    .chart-box {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    canvas { 
+      width: 100% !important; 
+      height: 260px !important; 
+      border-radius: 8px; 
+    }
+    .assets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .asset {
+      background: var(--card);
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+    .asset-name { font-weight: bold; color: #ccc; font-size: 0.9rem; }
+    .asset-price { font-size: 1rem; font-weight: bold; }
+    .asset-change { font-size: 0.8rem; }
+    .footer {
+      text-align: center;
+      margin: 24px 0 12px;
+      font-size: 0.75rem;
+      color: #666;
+    }
+    /* Mobile: Reduce padding */
+    @media (max-width: 600px) {
+      body { padding: 8px; }
+      .chart-box { padding: 10px; margin-bottom: 10px; }
+      canvas { height: 200px !important; }
+      .assets-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .asset { padding: 8px; font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Live BNB/USDT (1H)</h1>
+    <div class="ticker" id="livePrice">Loading...</div>
+    <div class="status" id="status">Connecting to Binance...</div>
+
+    <div class="chart-box"><canvas id="priceChart"></canvas></div>
+    <div class="chart-box"><canvas id="volumeChart"></canvas></div>
+    <div class="chart-box"><canvas id="rsiChart"></canvas></div>
+    <div class="chart-box"><canvas id="macdChart"></canvas></div>
+
+    <div class="assets-grid" id="assetsGrid"></div>
+
+    <div class="footer">
+      Binance WebSocket • EMA(9) WMA(20) HMA(21) • RSI(14) • MACD(12,26,9)
+    </div>
+  </div>
+
+  <script>
+    // === CONFIG ===
+    const MAIN_SYMBOL = "BNBUSDT";
+    const INTERVAL = "1h";
+    const LIMIT = 150;
+    const MAX_POINTS = 200;
+
+    const ANCHOR_PRICES = {
+      BTC: 51000, ETH: 2900, BNB: 350, ADA: 0.52,
+      SOL: 105, DOT: 7.2, DOGE: 0.12, XRP: 0.58,
+      LTC: 72, LINK: 15.8
+    };
+
+    // === DATA ARRAYS ===
+    let priceData = [], volumeData = [], rsiData = [], macdLine = [], signalLine = [], histogram = [];
+    let ema9 = [], wma20 = [], hma21 = [];
+    let priceChart, volumeChart, rsiChart, macdChart;
+    let wsKline, wsTickers;
+
+    // === INDICATOR: EMA ===
+    function calculateEMA(data, period) {
+      const k = 2 / (period + 1);
+      let ema = data[0].c;
+      const result = [ema];
+      for (let i = 1; i < data.length; i++) {
+        ema = data[i].c * k + ema * (1 - k);
+        result.push(ema);
+      }
+      return result;
+    }
+
+    // === INDICATOR: WMA ===
+    function calculateWMA(data, period) {
+      const weights = Array.from({length: period}, (_, i) => i + 1);
+      const sumWeights = weights.reduce((a,b) => a+b, 0);
+      const result = [];
+      for (let i = period - 1; i < data.length; i++) {
+        let sum = 0;
+        for (let j = 0; j < period; j++) {
+          sum += data[i - j].c * weights[j];
+        }
+        result.push(sum / sumWeights);
+      }
+      return result;
+    }
+
+    // === INDICATOR: HMA ===
+    function calculateHMA(data, period) {
+      const half = Math.floor(period / 2);
+      const sqrtP = Math.floor(Math.sqrt(period));
+      const wmaHalf = calculateWMA(data, half);
+      const wmaFull = calculateWMA(data, period);
+      const diff = wmaHalf.slice(-wmaFull.length).map((v, i) => v * 2 - wmaFull[i]);
+      return calculateWMA(diff.map((v, i) => ({c: v, x: data[i + half].x})), sqrtP);
+    }
+
+    // === INDICATOR: RSI ===
+    function calculateRSI(data, period = 14) {
+      if (data.length < period + 1) return [];
+      let gains = 0, losses = 0;
+      for (let i = 1; i <= period; i++) {
+        const diff = data[i].c - data[i-1].c;
+        if (diff > 0) gains += diff;
+        else losses -= diff;
+      }
+      let avgGain = gains / period;
+      let avgLoss = losses / period;
+      const rsi = [100 - (100 / (1 + avgGain / (avgLoss || 1)))];
+      
+      for (let i = period + 1; i < data.length; i++) {
+        const diff = data[i].c - data[i-1].c;
+        const gain = diff > 0 ? diff : 0;
+        const loss = diff < 0 ? -diff : 0;
+        avgGain = (avgGain * (period - 1) + gain) / period;
+        avgLoss = (avgLoss * (period - 1) + loss) / period;
+        rsi.push(100 - (100 / (1 + avgGain / (avgLoss || 1))));
+      }
+      return rsi;
+    }
+
+    // === INDICATOR: MACD ===
+    function calculateMACD(data, fast = 12, slow = 26, signal = 9) {
+      const emaFast = calculateEMA(data, fast);
+      const emaSlow = calculateEMA(data, slow);
+      const macd = emaFast.slice(-emaSlow.length).map((v, i) => v - emaSlow[i]);
+      const signalLine = calculateEMA(macd.map((v, i) => ({c: v, x: data[i + slow].x})), signal);
+      const histogram = signalLine.map((v, i) => macd[i + slow - fast] - v);
+      return { macd: macd.slice(-signalLine.length), signal: signalLine, histogram };
+    }
+
+    // === CHART INIT ===
+    function initCharts() {
+      const commonOpts = {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { type: 'time', time: { unit: 'hour' }, ticks: { color: '#ccc' }, grid: { color: '#333' } } }
+      };
+
+      // Price + MAs
+      priceChart = new Chart(document.getElementById('priceChart'), {
+        type: 'candlestick',
+        data: { datasets: [
+          { label: 'Price', data: priceData, borderColor: 'rgba(0,212,170,1)' },
+          { label: 'EMA(9)', data: [], borderColor: '#00ff88', borderWidth: 1.5, type: 'line', pointRadius: 0 },
+          { label: 'WMA(20)', data: [], borderColor: '#ffaa00', borderWidth: 1.5, type: 'line', pointRadius: 0 },
+          { label: 'HMA(21)', data: [], borderColor: '#ff00ff', borderWidth: 2, type: 'line', pointRadius: 0 }
+        ]},
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { position: 'right', ticks: { color: '#ccc' } } } }
+      });
+
+      // Volume
+      volumeChart = new Chart(document.getElementById('volumeChart'), {
+        type: 'bar',
+        data: { datasets: [{ data: volumeData, backgroundColor: ctx => {
+          const i = ctx.dataIndex;
+          const prev = priceData[i-1]?.c, curr = priceData[i]?.c;
+          return curr >= prev ? 'rgba(0,200,100,0.7)' : 'rgba(255,80,80,0.7)';
+        }}]},
+        options: { ...commonOpts, scales: { ...commonOpts.scales, x: { display: false } } }
+      });
+
+      // RSI
+      rsiChart = new Chart(document.getElementById('rsiChart'), {
+        type: 'line',
+        data: { datasets: [
+          { label: 'RSI', data: [], borderColor: '#aa00ff', fill: false, tension: 0.1 },
+          { label: '70', data: [], borderColor: '#ff5252', borderDash: [5], pointRadius: 0 },
+          { label: '30', data: [], borderColor: '#00d4aa', borderDash: [5], pointRadius: 0 }
+        ]},
+        options: { ...commonOpts, scales: { x: { display: false }, y: { min: 0, max: 100 } } }
+      });
+
+      // MACD
+      macdChart = new Chart(document.getElementById('macdChart'), {
+        type: 'bar',
+        data: { datasets: [
+          { label: 'Histogram', data: [], backgroundColor: ctx => ctx.raw.y >= 0 ? '#00d4aa' : '#ff5252' },
+          { label: 'MACD', data: [], borderColor: '#00aaff', type: 'line', pointRadius: 0 },
+          { label: 'Signal', data: [], borderColor: '#ffaa00', type: 'line', pointRadius: 0 }
+        ]},
+        options: { ...commonOpts, scales: { x: { display: false }, y: { ticks: { color: '#ccc' }, grid: { color: '#333' } } } }
+      });
+    }
+
+    // === UPDATE ALL INDICATORS ===
+    function updateIndicators() {
+      if (priceData.length < 35) return;
+
+      const closes = priceData.map(d => ({c: d.c, x: d.x}));
+
+      // MAs
+      ema9 = calculateEMA(closes, 9).map((v, i) => ({x: closes[i].x, y: v}));
+      wma20 = calculateWMA(closes, 20).map((v, i) => ({x: closes[i + 19].x, y: v}));
+      hma21 = calculateHMA(closes, 21).map((v, i) => ({x: closes[i + 20].x, y: v}));
+
+      // RSI
+      const rsiValues = calculateRSI(closes, 14).map((v, i) => ({x: closes[i + 14].x, y: v}));
+
+      // MACD
+      const { macd, signal, histogram: hist } = calculateMACD(closes, 12, 26, 9);
+      const macdX = closes.slice(-hist.length).map(d => d.x);
+      macdLine = macd.map((v, i) => ({x: macdX[i], y: v}));
+      signalLine = signal.map((v, i) => ({x: macdX[i], y: v}));
+      histogram = hist.map((v, i) => ({x: macdX[i], y: v}));
+
+      // Update charts
+      priceChart.data.datasets[1].data = ema9;
+      priceChart.data.datasets[2].data = wma20;
+      priceChart.data.datasets[3].data = hma21;
+
+      rsiChart.data.datasets[0].data = rsiValues;
+      rsiChart.data.datasets[1].data = rsiValues.map(d => ({x: d.x, y: 70}));
+      rsiChart.data.datasets[2].data = rsiValues.map(d => ({x: d.x, y: 30}));
+
+      macdChart.data.datasets[0].data = histogram;
+      macdChart.data.datasets[1].data = macdLine;
+      macdChart.data.datasets[2].data = signalLine;
+
+      priceChart.update('quiet');
+      rsiChart.update('quiet');
+      macdChart.update('quiet');
+    }
+
+    // === LOAD HISTORICAL ===
+    async function loadHistorical() {
+      setStatus('Loading historical data...', '#ffeb3b');
+      try {
+        const url = `https://api.binance.com/api/v3/klines?symbol=${MAIN_SYMBOL}&interval=${INTERVAL}&limit=${LIMIT}`;
+        const res = await fetch(url);
+        const klines = await res.json();
+
+        priceData = klines.map(k => ({
+          x: new Date(k[0]),
+          o: parseFloat(k[1]), h: parseFloat(k[2]),
+          l: parseFloat(k[3]), c: parseFloat(k[4])
+        }));
+        volumeData = klines.map(k => ({ x: new Date(k[0]), y: parseFloat(k[5]) }));
+
+        priceChart.data.datasets[0].data = priceData;
+        volumeChart.data.datasets[0].data = volumeData;
+        priceChart.update('quiet');
+        volumeChart.update('quiet');
+
+        updateIndicators();
+        updateLivePrice(priceData[priceData.length - 1].c);
+        setStatus('Live • Real-time updates', '#00d4aa');
+      } catch (err) {
+        setStatus('Retry in 5s...', '#ff5252');
+        setTimeout(loadHistorical, 5000);
+      }
+    }
+
+    // === WEBSOCKET: KLINE ===
+    function connectKline() {
+      wsKline = new WebSocket(`wss://stream.binance.com:9443/ws/${MAIN_SYMBOL.toLowerCase()}@kline_${INTERVAL}`);
+      wsKline.onopen = () => console.log('Kline connected');
+      wsKline.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        const k = msg.k;
+        if (k && k.x) {
+          const candle = {
+            x: new Date(k.t),
+            o: parseFloat(k.o), h: parseFloat(k.h),
+            l: parseFloat(k.l), c: parseFloat(k.c)
+          };
+          priceData.push(candle);
+          volumeData.push({ x: candle.x, y: parseFloat(k.v) });
+
+          if (priceData.length > MAX_POINTS) {
+            priceData.shift();
+            volumeData.shift();
+          }
+
+          priceChart.data.datasets[0].data = priceData;
+          volumeChart.data.datasets[0].data = volumeData;
+          priceChart.update('active');
+          volumeChart.update('active');
+
+          updateIndicators();
+          updateLivePrice(candle.c);
+        }
+      };
+      wsKline.onclose = () => setTimeout(connectKline, 3000);
+    }
+
+    // === WEBSOCKET: TICKERS ===
+    function connectTickers() {
+      const streams = Object.keys(ANCHOR_PRICES).map(s => `${s.toLowerCase()}usdt@miniTicker`).join('/');
+      wsTickers = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+      wsTickers.onopen = () => console.log('Tickers connected');
+      wsTickers.onmessage = (e) => {
+        const data = JSON.parse(e.data).data;
+        if (!data || !data.s) return;
+        const sym = data.s.replace('USDT', '');
+        if (!ANCHOR_PRICES[sym]) return;
+        const price = parseFloat(data.c);
+        const change = ((price - ANCHOR_PRICES[sym]) / ANCHOR_PRICES[sym]) * 100;
+        const el = document.getElementById(`${sym}-price`);
+        const ch = document.getElementById(`${sym}-change`);
+        if (el && ch) {
+          el.textContent = `$${price.toFixed(sym === 'ADA' || sym === 'DOGE' ? 4 : 2)}`;
+          ch.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+          ch.style.color = change >= 0 ? '#00d4aa' : '#ff5252';
+        }
+      };
+      wsTickers.onclose = () => setTimeout(connectTickers, 3000);
+    }
+
+    // === UI ===
+    function updateLivePrice(price) {
+      const ref = ANCHOR_PRICES.BNB;
+      const change = ((price - ref) / ref) * 100;
+      const el = document.getElementById('livePrice');
+      el.textContent = `$${price.toFixed(2)} ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+      el.style.color = change >= 0 ? '#00d4aa' : '#ff5252';
+    }
+
+    function setStatus(msg, color) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.style.color = color;
+    }
+
+    function renderAssets() {
+      const grid = document.getElementById('assetsGrid');
+      grid.innerHTML = Object.entries(ANCHOR_PRICES).map(([sym]) => `
+        <div class="asset">
+          <div class="asset-name">${sym}/USDT</div>
+          <div class="asset-price" id="${sym}-price">—</div>
+          <div class="asset-change" id="${sym}-change">—</div>
+        </div>
+      `).join('');
+    }
+
+    // === START ===
+    window.onload = () => {
+      renderAssets();
+      initCharts();
+      loadHistorical().then(() => {
+        connectKline();
+        connectTickers();
+      });
+    };
+  </script>
+</body>
+</html>
