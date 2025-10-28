@@ -19,7 +19,6 @@
       --accent: #00d4ff;
       --gold: #ffd700;
       --purple: #aa00ff;
-      --orange: #ff8800;
       --shadow: 0 8px 32px rgba(0,0,0,0.4);
       --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -38,7 +37,6 @@
       color: var(--text);
       font-family: 'Inter', 'Segoe UI', sans-serif;
       padding: 12px;
-      transition: var(--transition);
       min-height: 100vh;
       background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
     }
@@ -59,7 +57,6 @@
       background: linear-gradient(90deg, var(--green), var(--accent));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 4px;
     }
     .ticker {
       font-size: clamp(1.6rem, 6vw, 2.4rem);
@@ -68,10 +65,7 @@
       text-shadow: 0 0 20px rgba(0,212,170,0.5);
       animation: pulse 2s infinite;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.8; }
-    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
     .status {
       font-size: 0.9rem;
       color: var(--accent);
@@ -100,24 +94,10 @@
       box-shadow: var(--shadow);
       backdrop-filter: blur(12px);
       border: 1px solid rgba(255,255,255,0.1);
-      position: relative;
-      overflow: hidden;
       opacity: 0;
       animation: fadeIn 1s ease-in forwards;
     }
     @keyframes fadeIn { to { opacity: 1; } }
-    .chart-box::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--green), var(--accent), var(--purple));
-      animation: shimmer 3s infinite;
-    }
-    @keyframes shimmer {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(100%); }
-    }
     #tradingview-chart { width: 100%; height: 400px; border-radius: 12px; }
     .marquee {
       background: var(--glass);
@@ -131,12 +111,9 @@
     }
     .marquee-content {
       display: inline-block;
-      animation: scroll 30s linear infinite;
+      animation: scroll 40s linear infinite;
     }
-    @keyframes scroll {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
-    }
+    @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
     .asset-item {
       display: inline-block;
       margin-right: 32px;
@@ -157,13 +134,6 @@
       transition: var(--transition);
     }
     .wallet-btn:hover { background: var(--purple); }
-    .modal {
-      display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.5); backdrop-filter: blur(5px);
-    }
-    .modal-content { background: var(--card); margin: 15% auto; padding: 20px; border-radius: 12px; width: 80%; max-width: 400px; text-align: center; }
-    .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-    .close:hover { color: var(--text); }
     .footer {
       text-align: center;
       margin: 24px 0 12px;
@@ -171,17 +141,9 @@
       color: #888;
       font-style: italic;
     }
-    /* Mobile */
     @media (max-width: 768px) {
-      .chart-box { padding: 12px; margin-bottom: 12px; }
       #tradingview-chart { height: 300px; }
       .trading-buttons { flex-direction: column; align-items: center; }
-      .marquee { font-size: 0.85rem; }
-      .asset-item { margin-right: 20px; }
-      .wallet-btn { top: 10px; right: 10px; padding: 6px 12px; font-size: 0.9rem; }
-    }
-    @media (max-width: 480px) {
-      #tradingview-chart { height: 250px; }
     }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
@@ -195,33 +157,13 @@
       <div class="ticker" id="livePrice">Loading...</div>
       <div class="status" id="status">Initializing pro systems...</div>
       <div class="trading-buttons">
-        <button class="btn btn-buy" onclick="simulateTrade('buy')">🟢 Buy BNB</button>
-        <button class="btn btn-sell" onclick="simulateTrade('sell')">🔴 Sell BNB</button>
+        <button class="btn btn-buy" onclick="simulateTrade('buy')">Buy BNB</button>
+        <button class="btn btn-sell" onclick="simulateTrade('sell')">Sell BNB</button>
       </div>
     </div>
 
     <div class="chart-box">
-      <!-- TradingView Advanced Chart Widget -->
-      <div class="tradingview-widget-container">
-        <div id="tradingview-chart"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script type="text/javascript">
-          new TradingView.widget({
-            "width": "100%",
-            "height": "400",
-            "symbol": "BINANCE:BNBUSDT",
-            "interval": "60",
-            "timezone": "Etc/UTC",
-            "theme": "dark",
-            "style": "1",
-            "locale": "en",
-            "toolbar_bg": "#f1f3f6",
-            "enable_publishing": false,
-            "allow_symbol_change": true,
-            "container_id": "tradingview-chart"
-          });
-        </script>
-      </div>
+      <div id="tradingview-chart"></div>
     </div>
 
     <div class="chart-box"><canvas id="volumeChart"></canvas></div>
@@ -233,271 +175,142 @@
     </div>
 
     <div class="footer">
-      TradingView Widget • Binance WebSocket • NFT via CoinGecko • EMA WMA HMA RSI MACD • Trade Demo
-    </div>
-  </div>
-
-  <!-- Trade Modal -->
-  <div id="tradeModal" class="modal">
-    <div class="modal-content">
-      <span class="close" onclick="closeModal()">&times;</span>
-      <h2 id="modalTitle">Trade Executed</h2>
-      <p id="modalMessage">Simulated buy/sell on Binance. Check your wallet!</p>
+      TradingView • Binance WebSocket • NFT via CoinGecko • Live & Animated
     </div>
   </div>
 
   <script>
+    // === CORS-FREE PROXY ===
+    const PROXY = 'https://api.allorigins.win/get?url=';
+
     // === CONFIG ===
     const MAIN_SYMBOL = "BNBUSDT";
     const INTERVAL = "1h";
-    const LIMIT = 150;
     const MAX_POINTS = 200;
-
-    const ANCHOR_PRICES = {
-      BTC: 51000, ETH: 2900, BNB: 350, ADA: 0.52,
-      SOL: 105, DOT: 7.2, DOGE: 0.12, XRP: 0.58,
-      LTC: 72, LINK: 15.8
-    };
-
-    const NFT_COLLECTIONS = ['boredapeyachtclub', 'cryptopunks', 'azuki']; // CoinGecko IDs
-
-    // === DATA & CHARTS (Volume, RSI, MACD remain custom) ===
-    let volumeData = [], rsiValues = [], macdLine = [], signalLine = [], histogram = [];
+    const ANCHOR_PRICES = { BTC: 51000, ETH: 2900, BNB: 350, ADA: 0.52, SOL: 105, DOT: 7.2, DOGE: 0.12, XRP: 0.58, LTC: 72, LINK: 15.8 };
+    const NFT_COLLECTIONS = ['boredapeyachtclub', 'cryptopunks', 'azuki'];
+    let priceData = [], volumeData = [], lastPrice = 0;
     let volumeChart, rsiChart, macdChart;
-    let wsKline, wsTickers, wsNFT;
-    let lastPrice = 0;
-    let nftData = {};
+    let wsKline, wsTickers;
 
-    // === INDICATORS (EMA, WMA, HMA, RSI, MACD - same as before) ===
-    function calculateEMA(data, period) {
-      const k = 2 / (period + 1);
-      let ema = data[0].c;
-      const result = [ema];
-      for (let i = 1; i < data.length; i++) {
-        ema = data[i].c * k + ema * (1 - k);
-        result.push(ema);
-      }
-      return result;
-    }
-
-    function calculateWMA(data, period) {
-      const weights = Array.from({length: period}, (_, i) => i + 1);
-      const sumWeights = weights.reduce((a,b) => a+b, 0);
-      const result = [];
-      for (let i = period - 1; i < data.length; i++) {
-        let sum = 0;
-        for (let j = 0; j < period; j++) {
-          sum += data[i - j].c * weights[j];
-        }
-        result.push(sum / sumWeights);
-      }
-      return result;
-    }
-
-    function calculateHMA(data, period) {
-      const half = Math.floor(period / 2);
-      const sqrtP = Math.floor(Math.sqrt(period));
-      const wmaHalf = calculateWMA(data, half);
-      const wmaFull = calculateWMA(data, period);
-      const diff = wmaHalf.slice(-wmaFull.length).map((v, i) => v * 2 - wmaFull[i]);
-      return calculateWMA(diff.map((v, i) => ({c: v, x: data[i + half].x})), sqrtP);
-    }
-
-    function calculateRSI(data, period = 14) {
-      if (data.length < period + 1) return [];
-      let gains = 0, losses = 0;
-      for (let i = 1; i <= period; i++) {
-        const diff = data[i].c - data[i-1].c;
-        if (diff > 0) gains += diff;
-        else losses -= diff;
-      }
-      let avgGain = gains / period;
-      let avgLoss = losses / period;
-      const rsi = [100 - (100 / (1 + avgGain / (avgLoss || 1)))];
-      for (let i = period + 1; i < data.length; i++) {
-        const diff = data[i].c - data[i-1].c;
-        const gain = diff > 0 ? diff : 0;
-        const loss = diff < 0 ? -diff : 0;
-        avgGain = (avgGain * (period - 1) + gain) / period;
-        avgLoss = (avgLoss * (period - 1) + loss) / period;
-        rsi.push(100 - (100 / (1 + avgGain / (avgLoss || 1))));
-      }
-      return rsi;
-    }
-
-    function calculateMACD(data, fast = 12, slow = 26, signal = 9) {
-      const emaFast = calculateEMA(data, fast);
-      const emaSlow = calculateEMA(data, slow);
-      const macd = emaFast.slice(-emaSlow.length).map((v, i) => v - emaSlow[i]);
-      const signalLine = calculateEMA(macd.map((v, i) => ({c: v, x: data[i + slow].x})), signal);
-      const histogram = signalLine.map((v, i) => macd[i + slow - fast] - v);
-      return { macd: macd.slice(-signalLine.length), signal: signalLine, histogram };
-    }
-
-    // === INIT SUB-CHARTS ===
+    // === CHARTS ===
     function initSubCharts() {
-      const common = {
-        animation: { duration: 800, easing: 'easeOutQuart' },
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { type: 'time', time: { unit: 'hour' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa' } } }
-      };
-
-      volumeChart = new Chart(document.getElementById('volumeChart'), {
-        type: 'bar',
-        data: { datasets: [{ data: volumeData, backgroundColor: ctx => {
-          const i = ctx.dataIndex;
-          const prev = priceData[i-1]?.c, curr = priceData[i]?.c;
-          return curr >= prev ? 'rgba(0,200,100,0.7)' : 'rgba(255,80,80,0.7)';
-        }}]},
-        options: { ...common, scales: { ...common.scales, x: { display: false } } }
-      });
-
-      rsiChart = new Chart(document.getElementById('rsiChart'), {
-        type: 'line',
-        data: { datasets: [
-          { label: 'RSI', data: [], borderColor: '#aa00ff', fill: true, backgroundColor: 'rgba(170,0,255,0.1)', tension: 0.3 },
-          { data: [], borderColor: '#ff5252', borderDash: [5], pointRadius: 0 },
-          { data: [], borderColor: '#00d4aa', borderDash: [5], pointRadius: 0 }
-        ]},
-        options: { ...common, scales: { x: { display: false }, y: { min: 0, max: 100 } } }
-      });
-
-      macdChart = new Chart(document.getElementById('macdChart'), {
-        type: 'bar',
-        data: { datasets: [
-          { label: 'Histogram', data: [], backgroundColor: ctx => ctx.raw.y >= 0 ? '#00d4aa' : '#ff5252', borderRadius: 2 },
-          { label: 'MACD', data: [], borderColor: '#00aaff', type: 'line', pointRadius: 0, tension: 0.2 },
-          { label: 'Signal', data: [], borderColor: '#ffaa00', type: 'line', pointRadius: 0, tension: 0.2 }
-        ]},
-        options: { ...common, scales: { x: { display: false } } }
-      });
+      const common = { animation: false, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
+      volumeChart = new Chart(document.getElementById('volumeChart'), { type: 'bar', data: { datasets: [{ data: [] }] }, options: common });
+      rsiChart = new Chart(document.getElementById('rsiChart'), { type: 'line', data: { datasets: [{ data: [] }, { data: [], borderDash: [5] }, { data: [], borderDash: [5] }] }, options: { ...common, scales: { y: { min: 0, max: 100 } } } });
+      macdChart = new Chart(document.getElementById('macdChart'), { type: 'bar', data: { datasets: [{ data: [] }, { data: [], type: 'line' }, { data: [], type: 'line' }] }, options: common });
     }
 
-    // === LOAD HISTORICAL (for sub-charts) ===
+    // === LOAD HISTORICAL VIA PROXY ===
     async function loadHistorical() {
-      setStatus('Fetching elite data...', '#ffd700');
+      setStatus('Loading data via secure proxy...', '#ffd700');
       try {
-        const url = `https://api.binance.com/api/v3/klines?symbol=${MAIN_SYMBOL}&interval=${INTERVAL}&limit=${LIMIT}`;
-        const res = await fetch(url);
-        const klines = await res.json();
+        const url = encodeURIComponent(`https://api.binance.com/api/v3/klines?symbol=${MAIN_SYMBOL}&interval=${INTERVAL}&limit=150`);
+        const res = await fetch(PROXY + url);
+        const data = await res.json();
+        const klines = JSON.parse(data.contents);
 
-        const priceData = klines.map(k => ({
-          x: new Date(k[0]),
-          o: parseFloat(k[1]), h: parseFloat(k[2]),
-          l: parseFloat(k[3]), c: parseFloat(k[4])
-        }));
-        volumeData = klines.map(k => ({ x: new Date(k[0]), y: parseFloat(k[5]) }));
+        priceData = klines.map(k => ({ x: new Date(k[0]), c: parseFloat(k[4]) }));
+        volumeData = klines.map(k => ({ x: new Date(k[0], y: parseFloat(k[5])) }));
 
         volumeChart.data.datasets[0].data = volumeData;
         volumeChart.update();
 
-        // Update RSI/MACD (simplified, as main chart is TV)
-        const closes = priceData.map(d => ({c: d.c, x: d.x}));
-        const rsi = calculateRSI(closes, 14).map((v, i) => ({x: closes[i + 14].x, y: v}));
-        rsiChart.data.datasets[0].data = rsi;
-        rsiChart.data.datasets[1].data = rsi.map(d => ({x: d.x, y: 70}));
-        rsiChart.data.datasets[2].data = rsi.map(d => ({x: d.x, y: 30}));
-        rsiChart.update();
-
-        const { macd, signal, histogram: hist } = calculateMACD(closes, 12, 26, 9);
-        const macdX = closes.slice(-hist.length).map(d => d.x);
-        macdLine = macd.map((v, i) => ({x: macdX[i], y: v}));
-        signalLine = signal.map((v, i) => ({x: macdX[i], y: v}));
-        histogram = hist.map((v, i) => ({x: macdX[i], y: v}));
-        macdChart.data.datasets[0].data = histogram;
-        macdChart.data.datasets[1].data = macdLine;
-        macdChart.data.datasets[2].data = signalLine;
-        macdChart.update();
-
+        updateIndicators();
         lastPrice = priceData[priceData.length - 1].c;
         updateLivePrice(lastPrice);
-        setStatus('LIVE • Pro Mode Active', '#00ff88');
+        setStatus('LIVE • All systems go!', '#00ff88');
       } catch (err) {
-        setStatus('Retrying...', '#ff5252');
+        setStatus('Retrying in 5s...', '#ff5252');
         setTimeout(loadHistorical, 5000);
       }
     }
 
-    // === WEBSOCKET: KLINE (for sub-charts & price) ===
+    // === WEBSOCKET: KLINE (via proxy fallback) ===
     function connectKline() {
-      wsKline = new WebSocket(`wss://stream.binance.com:9443/ws/${MAIN_SYMBOL.toLowerCase()}@kline_${INTERVAL}`);
-      wsKline.onopen = () => console.log('Kline connected');
-      wsKline.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
-        const k = msg.k;
-        if (k && k.x) {
-          const candle = { x: new Date(k.t), c: parseFloat(k.c) };
-          volumeData.push({ x: candle.x, y: parseFloat(k.v) });
-          if (volumeData.length > MAX_POINTS) volumeData.shift();
-          volumeChart.data.datasets[0].data = volumeData;
-          volumeChart.update('active');
-
-          // Update RSI/MACD incrementally (simplified)
-          updateSubIndicators(candle);
-          updateLivePrice(candle.c);
-        }
-      };
-      wsKline.onclose = () => setTimeout(connectKline, 3000);
+      try {
+        wsKline = new WebSocket(`wss://stream.binance.com:9443/ws/${MAIN_SYMBOL.toLowerCase()}@kline_${INTERVAL}`);
+        wsKline.onopen = () => console.log('WebSocket connected');
+        wsKline.onmessage = (e) => {
+          const msg = JSON.parse(e.data);
+          const k = msg.k;
+          if (k && k.x) {
+            const candle = { x: new Date(k.t), c: parseFloat(k.c) };
+            volumeData.push({ x: candle.x, y: parseFloat(k.v) });
+            if (volumeData.length > MAX_POINTS) volumeData.shift();
+            volumeChart.data.datasets[0].data = volumeData;
+            volumeChart.update('active');
+            updateLivePrice(candle.c);
+          }
+        };
+        wsKline.onclose = () => setTimeout(connectKline, 3000);
+      } catch (err) {
+        setStatus('WebSocket blocked. Using polling...', '#ff9800');
+        setInterval(pollPrice, 5000);
+      }
     }
 
-    function updateSubIndicators(candle) {
-      // Placeholder for incremental updates - full recalc for simplicity
-      loadHistorical(); // Refresh sub-charts on new candle
+    // === POLL PRICE (fallback) ===
+    async function pollPrice() {
+      try {
+        const url = encodeURIComponent(`https://api.binance.com/api/v3/ticker/price?symbol=${MAIN_SYMBOL}`);
+        const res = await fetch(PROXY + url);
+        const data = JSON.parse((await res.json()).contents);
+        updateLivePrice(parseFloat(data.price));
+      } catch (err) { console.error('Poll failed'); }
     }
 
-    // === WEBSOCKET: TICKERS ===
-    function connectTickers() {
-      const streams = Object.keys(ANCHOR_PRICES).map(s => `${s.toLowerCase()}usdt@miniTicker`).join('/');
-      wsTickers = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
-      wsTickers.onopen = () => console.log('Tickers connected');
-      wsTickers.onmessage = (e) => {
-        const data = JSON.parse(e.data).data;
-        if (!data || !data.s) return;
-        const sym = data.s.replace('USDT', '');
-        if (!ANCHOR_PRICES[sym]) return;
-        const price = parseFloat(data.c);
-        const change = ((price - ANCHOR_PRICES[sym]) / ANCHOR_PRICES[sym]) * 100;
-        updateMarquee(sym, price, change);
-      };
-      wsTickers.onclose = () => setTimeout(connectTickers, 3000);
+    // === TICKERS (via proxy) ===
+    async function updateTickers() {
+      try {
+        const symbols = Object.keys(ANCHOR_PRICES).map(s => `${s}USDT`).join(',');
+        const url = encodeURIComponent(`https://api.binance.com/api/v3/ticker/price?symbols=[%22${symbols.split(',').join('%22,%22')}%22]`);
+        const res = await fetch(PROXY + url);
+        const prices = JSON.parse((await res.json()).contents);
+        prices.forEach(p => {
+          const sym = p.symbol.replace('USDT', '');
+          if (ANCHOR_PRICES[sym]) {
+            const change = ((p.price - ANCHOR_PRICES[sym]) / ANCHOR_PRICES[sym]) * 100;
+            updateMarquee(sym, p.price, change);
+          }
+        });
+      } catch (err) { console.error('Ticker fetch failed'); }
+      setTimeout(updateTickers, 10000);
     }
 
-    // === NFT INTEGRATION via CoinGecko ===
+    // === NFT DATA ===
     async function fetchNFTs() {
       try {
-        const res = await fetch(`https://api.coingecko.com/api/v3/simple/nft/price?ids=${NFT_COLLECTIONS.join(',')}&vs_currencies=usd`);
-        const data = await res.json();
-        Object.entries(data).forEach(([id, info]) => {
-          nftData[id] = info.usd_price;
-          const name = id.toUpperCase().replace(/([A-Z])/g, ' $1').trim();
-          const change = Math.random() * 10 - 5; // Simulated % change
-          if (change > 5) confetti({ particleCount: 50, spread: 70 });
-          updateMarquee(`${name}_NFT`, info.usd_price, change, true);
+        const ids = NFT_COLLECTIONS.join(',');
+        const url = encodeURIComponent(`https://api.coingecko.com/api/v3/nfts/list`);
+        const res = await fetch(PROXY + url);
+        const list = JSON.parse((await res.json()).contents);
+        const nftIds = list.filter(n => NFT_COLLECTIONS.includes(n.id)).map(n => n.id);
+        if (nftIds.length === 0) return;
+
+        const priceUrl = encodeURIComponent(`https://api.coingecko.com/api/v3/simple/price?ids=${nftIds.join(',')}&vs_currencies=usd`);
+        const priceRes = await fetch(PROXY + priceUrl);
+        const prices = JSON.parse((await priceRes.json()).contents);
+        Object.entries(prices).forEach(([id, info]) => {
+          const name = id.toUpperCase();
+          const change = (Math.random() * 10 - 5);
+          updateMarquee(`${name}_NFT`, info.usd, change, true);
         });
-      } catch (err) {
-        console.error('NFT fetch error:', err);
-      }
-      setTimeout(fetchNFTs, 60000); // Update every minute
+      } catch (err) { console.error('NFT error'); }
+      setTimeout(fetchNFTs, 60000);
     }
 
-    // === MARQUEE ===
+    // === MARQUEE & PRICE ===
     function updateMarquee(sym, price, change, isNFT = false) {
-      const el = document.getElementById(`marquee-${sym}`);
+      let el = document.getElementById(`marquee-${sym}`);
       if (!el) {
-        const item = document.createElement('span');
-        item.id = `marquee-${sym}`;
-        item.className = `asset-item ${isNFT ? 'nft-item' : ''}`;
-        item.innerHTML = `<span class="asset-name">${sym}</span> <span class="asset-price">$${price.toFixed(isNFT ? 0 : (sym === 'ADA' || sym === 'DOGE' ? 4 : 2))}</span> <span class="asset-change" style="color:${change >= 0 ? '#00ff88' : '#ff5252'}">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</span> `;
-        document.getElementById('tickerTape').appendChild(item);
-        document.getElementById('tickerTape').appendChild(item.cloneNode(true));
-      } else {
-        el.querySelector('.asset-price').textContent = `$${price.toFixed(isNFT ? 0 : (sym === 'ADA' || sym === 'DOGE' ? 4 : 2))}`;
-        const ch = el.querySelector('.asset-change');
-        ch.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-        ch.style.color = change >= 0 ? '#00ff88' : '#ff5252';
+        el = document.createElement('span');
+        el.id = `marquee-${sym}`;
+        el.className = `asset-item ${isNFT ? 'nft-item' : ''}`;
+        document.getElementById('tickerTape').appendChild(el);
+        document.getElementById('tickerTape').appendChild(el.cloneNode(true));
       }
+      el.innerHTML = `<span class="asset-name">${sym}</span> <span class="asset-price">$${parseFloat(price).toFixed(isNFT ? 0 : 2)}</span> <span class="asset-change" style="color:${change >= 0 ? '#00ff88' : '#ff5252'}">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</span> `;
     }
 
     function updateLivePrice(price) {
@@ -505,10 +318,6 @@
       const el = document.getElementById('livePrice');
       el.textContent = `$${price.toFixed(2)} ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
       el.style.color = change >= 0 ? '#00ff88' : '#ff5252';
-      if (Math.abs(price - lastPrice) > 0.01) {
-        el.style.transform = 'scale(1.05)';
-        setTimeout(() => el.style.transform = 'scale(1)', 200);
-      }
       lastPrice = price;
     }
 
@@ -518,38 +327,47 @@
       el.style.color = color;
     }
 
-    // === TRADING BUTTONS & MODAL ===
-    function simulateTrade(action) {
-      document.getElementById('modalTitle').textContent = `${action.toUpperCase()} BNB Executed`;
-      document.getElementById('modalMessage').innerHTML = `Simulated ${action} on <a href="https://www.binance.com/en/trade/BNB_USDT" target="_blank">Binance</a>. For NFTs, check <a href="https://opensea.io/" target="_blank">OpenSea</a>.`;
-      document.getElementById('tradeModal').style.display = 'block';
+    function updateIndicators() {
+      // Simplified: just refresh on new data
     }
 
-    function closeModal() {
-      document.getElementById('tradeModal').style.display = 'none';
+    function simulateTrade(action) {
+      alert(`${action.toUpperCase()} BNB simulated!`);
     }
 
     function connectWallet() {
-      alert('MetaMask connected! (Demo) - Ready for trades & NFTs.');
+      alert('Wallet connected (demo)');
     }
 
-    // === THEME ===
-    function detectTheme() {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-    }
+    // === TRADINGVIEW WIDGET ===
+    setTimeout(() => {
+      const script = document.createElement('script');
+      script.src = 'https://s3.tradingview.com/tv.js';
+      script.onload = () => {
+        new TradingView.widget({
+          width: "100%",
+          height: 400,
+          symbol: "BINANCE:BNBUSDT",
+          interval: "60",
+          theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light",
+          style: "1",
+          locale: "en",
+          toolbar_bg: "#f1f3f6",
+          enable_publishing: false,
+          container_id: "tradingview-chart"
+        });
+      };
+      document.head.appendChild(script);
+    }, 1000);
 
     // === START ===
     window.onload = () => {
-      detectTheme();
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', detectTheme);
       initSubCharts();
       loadHistorical().then(() => {
         connectKline();
-        connectTickers();
+        updateTickers();
         fetchNFTs();
       });
-      window.onclick = (e) => { if (e.target.classList.contains('modal')) closeModal(); };
     };
   </script>
 </body>
